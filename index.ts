@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as jsdom from 'jsdom';
 
-import { urls } from './urls';
+const summaries: Record<string, string> = require('./summaries.json');
 
 type UrlSummary = {
     url: string;
@@ -47,20 +47,16 @@ async function getAllSummaries(urls: string[]) {
 }
 
 async function fetchSummary(url: string): Promise<UrlSummary> {
-    let summary: string;
+    let summary = '';
 
-    try { 
+    try {
         const result = await jsdom.JSDOM.fromURL(url);
-        const summaryElement = result.window.document.querySelector('#wikiArticle p:first-of-type');
-
+        const summaryElement = result.window.document.querySelector('#wikiArticle > p:not(:empty)');
         if (summaryElement) {
             summary = summaryElement.textContent;
-        } else {
-            summary = ''
         }
-    }
-    catch (ex) {
-        summary = '(no descriptions)'
+    } catch (ex) {
+        summary = '(no description)';
     }
 
     return { url, summary };
@@ -70,19 +66,19 @@ async function fetchSummary(url: string): Promise<UrlSummary> {
     console.log('starting');
 
     try {
-        const summaries = await getAllSummaries(urls); 
-        const summaryObject = summaries.reduce((c, n) => { 
-            c[n.url] = n.summary;
-            return c;
-        }, {})
+        const missingSummaries = Object.keys(summaries).filter(s => !summaries[s]);
+        const foundSummaries = await getAllSummaries(missingSummaries);
 
-        const fileContents = JSON.stringify(summaryObject, undefined, 4);
+        for (let n of foundSummaries) {
+            summaries[n.url] = n.summary;
+        }
+
+        const fileContents = JSON.stringify(summaries, undefined, 4);
         fs.writeFileSync('./summaries.json', fileContents, { encoding: 'utf-8' });
     } catch (ex) {
-        console.error(ex.toString()); 
+        console.error(ex.toString());
     }
-    
+
     console.log('ended');
     process.exit();
 })();
-
