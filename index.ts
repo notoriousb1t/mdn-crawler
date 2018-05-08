@@ -2,6 +2,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as jsdom from 'jsdom';
 
+const TurndownService = require('turndown')
+const turndownService = new TurndownService()
+
+// change anchors to plain text so we don't end up with a bunch of relative anchors
+turndownService.addRule('anchor', {
+    filter: 'a',
+    replacement: (content) => content
+})
+
 const summaries: Record<string, string> = require('./summaries.json');
 
 type UrlSummary = {
@@ -29,7 +38,7 @@ function sleep<T>(time: number, onComplete?: () => T): Promise<T> {
 }
 
 async function getAllSummaries(urls: string[]) {
-    const segmentSize = 5;
+    const segmentSize = 6;
     const interval = 100;
 
     const tasks: Promise<UrlSummary>[] = [];
@@ -53,7 +62,7 @@ async function fetchSummary(url: string): Promise<UrlSummary> {
         const result = await jsdom.JSDOM.fromURL(url);
         const summaryElement = result.window.document.querySelector('#wikiArticle > p:not(:empty)');
         if (summaryElement) {
-            summary = summaryElement.textContent;
+            summary = turndownService.turndown(summaryElement.innerHTML);
         }
     } catch (ex) {
         summary = '(no description)';
